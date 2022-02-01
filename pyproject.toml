@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "asyngpy"
+name = "asygpy"
 version = "0.1.0"
 description = "asyncio signal handlers for Windows and Unix"
 authors = ["asleep-cult <asleep.cult@gmail.com>"]
