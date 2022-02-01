@@ -82,9 +82,8 @@ class SignalNotifier:
             signums = await self.loop.sock_recv(self._csock, 4096)
 
             if self._wakeup_fd != -1:
-                assert self._wakeup_sock is None
                 self._wakeup_write(signums)
-            else:
+            elif self._wakeup_sock is not None:
                 self._wakeup_send(signums)
 
             for signum in signums:

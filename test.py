@@ -5,6 +5,8 @@ import asygpy
 
 
 async def main() -> None:
+    print("hello")
+
     notifier = asygpy.create_notifier()
     channel = (
         notifier.open_channel()
