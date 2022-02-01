@@ -22,6 +22,8 @@ async def main() -> None:
     elif signum == signal.SIGTERM:
         print("Shutting down due to SIGTERM")
 
+    notifier.stop_notifying()
+
 asyncio.run(main())
 ```
 
