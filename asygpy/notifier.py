@@ -37,7 +37,7 @@ class SignalNotifier:
         self._channels.append(channel)
         return channel
 
-    def notify(self, signum: int) -> None:
+    def notify(self, signum: signal.Signals) -> None:
         if signum not in signal.valid_signals():
             raise TypeError(f'Invalid signal: {signum}')
 
@@ -56,10 +56,7 @@ class SignalNotifier:
                 and exc.errno != errno.EAGAIN
             ):
                 message = 'Exception ignored when trying to write to the signal wakeup fd'
-                self.loop.call_exception_handler({
-                    'message': message,
-                    'exception': exc,
-                })
+                self.loop.call_exception_handler({'message': message, 'exception': exc})
 
     def _wakeup_send(self, data: bytes) -> None:
         assert self._wakeup_sock is not None
@@ -72,10 +69,7 @@ class SignalNotifier:
                 and exc.errno != errno.EAGAIN
             ):
                 message = 'Exception ignored when trying to send to the signal wakeup fd'
-                self.loop.call_exception_handler({
-                    'message': message,
-                    'exception': exc,
-                })
+                self.loop.call_exception_handler({'message': message, 'exception': exc})
 
     async def _read_loop(self) -> None:
         while True:
@@ -87,18 +81,21 @@ class SignalNotifier:
                 self._wakeup_send(signums)
 
             for signum in signums:
-                self.notify(signum)
+                try:
+                    self.notify(signal.Signals(signum))
+                except ValueError as exc:
+                    message = 'Notifier received invalid signal in read loop'
+                    self.loop.call_exception_handler({'message': message, 'exception': exc})
 
     def _set_wakeup_fd(self, wakeup_fd: int) -> None:
-        if wakeup_fd != -1:
-            try:
-                self._wakeup_sock = socket.socket(fileno=wakeup_fd)
-                self._wakeup_sock.setblocking(False)
-            except OSError as exc:
-                if exc.errno != WSAENOTSOCK:
-                    raise
+        try:
+            self._wakeup_sock = socket.socket(fileno=wakeup_fd)
+            self._wakeup_sock.setblocking(False)
+        except OSError as exc:
+            if exc.errno != WSAENOTSOCK:
+                raise
 
-                self._wakeup_fd = wakeup_fd
+            self._wakeup_fd = wakeup_fd
 
     def start_notifying(self) -> None:
         for signum in signal.valid_signals():
@@ -109,10 +106,11 @@ class SignalNotifier:
                     raise
 
         wakeup_fd = signal.set_wakeup_fd(self._ssock.fileno())
-        if WIN32:
-            self._set_wakeup_fd(wakeup_fd)
-        else:
-            self._wakeup_fd = wakeup_fd
+        if wakeup_fd != -1:
+            if WIN32:
+                self._set_wakeup_fd(wakeup_fd)
+            else:
+                self._wakeup_fd = wakeup_fd
 
         self._task = self.loop.create_task(self._read_loop())
 
@@ -129,7 +127,10 @@ class SignalNotifier:
                 if exc.errno != errno.EINVAL:
                     raise
 
-        signal.set_wakeup_fd(self._wakeup_fd)
+        if self._wakeup_sock is not None:
+            signal.set_wakeup_fd(self._wakeup_sock.detach())
+        else:
+            signal.set_wakeup_fd(self._wakeup_fd)
 
         self._wakeup_fd = -1
         self._wakeup_sock = None

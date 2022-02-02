@@ -15,11 +15,13 @@ async def main() -> None:
     )
     notifier.start_notifying()
 
-    async for signum in channel:
-        if signum == signal.SIGINT:
-            print("I received SIGINT but I don't care!")
-        elif signum == signal.SIGTERM:
-            print("I received SIGTERM but I don't care!")
+    signum = await channel.receive()
+    if signum == signal.SIGINT:
+        print("I received SIGINT but I don't care!")
+    elif signum == signal.SIGTERM:
+        print("I received SIGTERM but I don't care!")
+
+    notifier.stop_notifying()
 
 
 asyncio.run(main())
